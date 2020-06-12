@@ -1,70 +1,62 @@
-package com.example.SE_PA;
+package com.example.SE_PA.MVC;
 
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
-import android.text.method.ScrollingMovementMethod;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
+
+import com.example.SE_PA.CCallback;
+import com.example.SE_PA.MVC.Interface.IModel;
+import com.example.SE_PA.MVC.Interface.IView;
+import com.example.SE_PA.OkHttpSingleton;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class MainActivity extends AppCompatActivity {
+import java.util.HashMap;
+import java.util.Map;
 
-    private TextView textView;
-    private EditText editText;
-    private Button btn;
-    private TextView tip;
+public class Model implements IModel {
+    private IView view = null;
+    private Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        // 绑定TextView
-        textView = findViewById(R.id.tv);
-        // 设置可滚动
-        textView.setMovementMethod(new ScrollingMovementMethod());
-        editText = findViewById(R.id.edit);
-        btn = findViewById(R.id.btn);
-        tip = findViewById(R.id.tip);
-
-
-        btn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                tip.setText("waiting request......");
-                requestAndSetData(editText.getText().toString());
-            }
-        });
+    public void setView(IView view) {
+        this.view = view;
     }
 
-    private void requestAndSetData(String locId) {
-        String url ="https://www.metaweather.com/api/location/"+locId;
+    @Override
+    public void handleData(Map<String, String> data) {
+        if (TextUtils.isEmpty(data.get("input"))) {
+            return;
+        }
+        view.dataHanding();
+        handler.removeCallbacksAndMessages(null);
+
+        String url ="https://www.metaweather.com/api/location/"+data.get("input");
         OkHttpSingleton.getInstance().asyncGet(url, new CCallback() {
             @Override
             public void todo(final String str) {
-                runOnUiThread(new Runnable() {
+                handler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        if (TextUtils.isEmpty(str)) {
-                            tip.setText("request error");
-                        } else {
-                            textView.setText(json2string(str));
-                            tip.setText("request successful");
-                        }
+                        Map<String, String> map = new HashMap(){{
+                            put("result", json2string(str));
+                        }};
+                        view.onDataHandled(map);
                     }
-                });
+                }, 0);
             }
         });
-
     }
 
+    @Override
+    public void clearData() {
+        handler.removeCallbacksAndMessages(null);
+        view.onDataHandled(new HashMap<String, String>(){{put("clear","");}});
+    }
+
+    // 解析json
     private String json2string(String jsonstr) {
         StringBuilder stringBuilder = new StringBuilder();
         try {
